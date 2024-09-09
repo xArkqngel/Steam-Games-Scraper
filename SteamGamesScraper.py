@@ -144,7 +144,7 @@ def SteamRequest(appID, retryTime, successRequestCount, errorRequestCount, retri
       app = data[appID]
       if app['success'] == False:
         return None
-      elif app['data']['type'] != 'game':
+      elif app['data']['type'] not in ['game', 'dlc']:
         return None
       elif app['data']['is_free'] == False and 'price_overview' in app['data'] and app['data']['price_overview']['final_formatted'] == '':
         return None
@@ -178,6 +178,43 @@ def SteamSpyRequest(appID, retryTime, successRequestCount, errorRequestCount, re
   else:
     Log(ERROR, 'Bad response')
     return None
+  
+def parse_requirements(requirements):
+    '''
+    Parse requirements.
+    '''
+    cleaned_requirements = re.sub('<[^<]+?>', '', requirements).replace('<br>', '\n').replace('<li>', '\n')
+    
+    requirements_dict = {
+        'os': '',
+        'processor': '',
+        'memory': '',
+        'graphics': '',
+        'directX': '',
+        'network': '',
+        'storage': '',
+        'sound_card': '',
+        'additional_notes': ''
+    }
+
+    patterns = {
+        'os': r'OS\s*:\s*(.*)',
+        'processor': r'Processor\s*:\s*(.*)',
+        'memory': r'Memory\s*:\s*(.*)',
+        'graphics': r'Graphics\s*:\s*(.*)',
+        'directX': r'DirectX\s*:\s*(.*)',
+        'network': r'Network\s*:\s*(.*)',
+        'storage': r'Storage\s*:\s*(.*)',
+        'sound_card': r'Sound Card\s*:\s*(.*)',
+        'additional_notes': r'Additional Notes\s*:\s*(.*)',
+    }
+
+    for key, pattern in patterns.items():
+        match = re.search(pattern, cleaned_requirements)
+        if match:
+            requirements_dict[key] = match.group(1).strip()
+
+    return requirements_dict
 
 def ParseSteamGame(app):
   '''
@@ -194,11 +231,14 @@ def ParseSteamGame(app):
     game['price'] = PriceToFloat(app['price_overview']['final_formatted'])
 
   game['dlc_count'] = len(app['dlc']) if 'dlc' in app else 0
+  game['dlc'] = app['dlc'] if 'dlc' in app else []
+  game['is_dlc'] = app['type'] == 'dlc' if 'type' in app else False
   game['detailed_description'] = app['detailed_description'].strip() if 'detailed_description' in app else ''
   game['about_the_game'] = app['about_the_game'].strip() if 'about_the_game' in app else ''
   game['short_description'] = app['short_description'].strip() if 'short_description' in app else ''
   game['reviews'] = app['reviews'].strip() if 'reviews' in app else ''
   game['header_image'] = app['header_image'].strip() if 'header_image' in app else ''
+  game['capsule_image'] = app['capsule_imagev5'] if 'capsule_imagev5' in app else ''
   game['website'] = app['website'].strip() if 'website' in app and app['website'] is not None else ''
   game['support_url'] = app['support_info']['url'].strip() if 'support_info' in app else ''
   game['support_email'] = app['support_info']['email'].strip() if 'support_info' in app else ''
@@ -207,12 +247,14 @@ def ParseSteamGame(app):
   game['linux'] = True if app['platforms']['linux'] else False
   game['metacritic_score'] = int(app['metacritic']['score']) if 'metacritic' in app else 0
   game['metacritic_url'] = app['metacritic']['url'] if 'metacritic' in app else ''
-  game['achievements'] = int(app['achievements']['total']) if 'achievements' in app else 0
+  #game['achievements'] = app['achievements']['total']) if 'achievements' in app else 0
   game['recommendations'] = app['recommendations']['total'] if 'recommendations' in app else 0
   game['notes'] = app['content_descriptors']['notes'] if 'content_descriptors' in app and app['content_descriptors']['notes'] is not None else ''
 
   game['supported_languages'] = []
   game['full_audio_languages'] = []
+  game['minimum_requirements'] = []
+  game['recommended_requirements'] = []
 
   if 'supported_languages' in app:
     languagesApp = app['supported_languages']
@@ -224,6 +266,13 @@ def ParseSteamGame(app):
       if '*' in lang:
         game['full_audio_languages'].append(lang.replace('*', ''))
       game['supported_languages'].append(lang.replace('*', ''))
+      
+  if 'pc_requirements' in app:
+    pc_requirements = app['pc_requirements']
+    if 'minimum' in pc_requirements:
+      game['minimum_requirements'] = parse_requirements(pc_requirements['minimum'])
+    if 'recommended' in pc_requirements:
+      game['recommended_requirements'] = parse_requirements(pc_requirements['recommended'])
 
   game['packages'] = []
   if 'package_groups' in app:
@@ -236,6 +285,28 @@ def ParseSteamGame(app):
                        'price': round(float(sub['price_in_cents_with_discount']) * 0.01, 2) }) 
 
       game['packages'].append({'title': SanitizeText(package['title']), 'description': SanitizeText(package['description']), 'subs': subs})
+
+  game['achievements'] = []
+  if 'achievements' in app:
+    total_achievements = app['achievements']['total']
+    highlighted_achievements = app['achievements']['highlighted']
+    
+    game['achievements'] = {
+        'total': total_achievements,
+        'highlighted': [
+            {
+                'name': achievement['name'],
+                'path': achievement['path']
+            }
+            for achievement in highlighted_achievements
+        ]
+      }
+  else:
+      game['achievements'] = {
+          'total': 0,
+          'highlighted': []
+      }
+
 
   game['developers'] = []
   if 'developers' in app:

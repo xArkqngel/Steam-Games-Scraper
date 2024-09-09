@@ -21,6 +21,7 @@ for app in dataset:
   price = game['price']                               # Price in USD, 0.0 if its free (float).
   discount = game['discount']                         # Discount in percentage, 0 if it has none (int).
   dlcCount = game['dlc_count']                        # Number of DLCs, 0 if you have none (int).
+  dlc = game['dlc']                                   # DLCs.
   longDesc = game['detailed_description']             # Detailed description of the game (string).
   shortDesc = game['short_description']               # Brief description of the game,
                                                       # does not contain HTML tags (string).
@@ -40,7 +41,7 @@ for app in dataset:
   positive = game['positive']                         # Positive votes (int).
   negative = game['negative']                         # Negative votes (int).
   scoreRank = game['score_rank']                      # Score rank of the game based on user reviews (string).
-  achievements = game['achievements']                 # Number of achievements, 0 if it has none (int).
+  achievements = game['achievements']                 # Number of achievements, 0 if it has none (int). Modified for this version, returning the achievements object
   recommens = game['recommendations']                 # User recommendations, 0 if it has none (int).
   notes = game['notes']                               # Extra information about the game content (string).
   averagePlaytime = game['average_playtime_forever']  # Average playtime since March 2009, in minutes (int).
